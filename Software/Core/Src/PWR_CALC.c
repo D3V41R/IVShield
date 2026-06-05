@@ -23,59 +23,6 @@ float period = 0;
 bool acPresent = false;
 bool relayActive = false;
 
-#define LCD_ADDR (0x27 << 1)
-
-void calculatePwr(void);
-void CrossDetection(void);
-
-int mainn(void){
-    HAL_ADC_Start(&hadc1);
-    Lcd_Init();
-
-    while(1){
-        for(int i = 0; i < 12; i++){
-            HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-            adcBuffer[i] = HAL_ADC_GetValue(&hadc1);
-        }
-
-        calculatePwr();
-        CrossDetection();
-
-        if(VRms <= 85.0f){
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-            relayActive = true;
-        } else {
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
-            relayActive = false;
-        }
-
-        Lcd_Update();
-        HAL_Delay(25);
-    }
-
-    return 0;
-}
-
-void Lcd_Update(void){
-    char line1[17];
-    char line2[17];
-
-    // Line 1: Voltage and frequency
-    sprintf(line1, sizeof(line1), "V:%.1fV F:%.1fHz", VRms, frequency);
-
-    // Line 2: Source and AC status
-    if(relayActive){
-        snprintf(line2, sizeof(line2), "SRC:BACKUP %s", acPresent ? "AC:ON" : "AC:OFF");
-    } else {
-        snprintf(line2, sizeof(line2), "SRC:GRID   %s", acPresent ? "AC:ON" : "AC:OFF");
-    }
-
-    Lcd_SetCursor(0, 0);
-    Lcd_SendString(line1);
-    Lcd_SetCursor(1, 0);
-    Lcd_SendString(line2);
-}
-
 void calculatePwr(void){
     Pwr = 0;
     VRms = 0;
@@ -93,7 +40,6 @@ void calculatePwr(void){
     Pwr = Pwr / 12.0f;
     VRms = sqrtf(VRms / 12.0f);
     IRms = sqrtf(IRms / 12.0f);
-
     ApparentPwr = VRms * IRms;
     pf = Pwr / ApparentPwr;
 }
@@ -103,7 +49,7 @@ void CrossDetection(void){
     uint32_t now = HAL_GetTick();
     uint32_t periodMs = now - lastTime;
 
-    if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_SET){
+    if(HAL_GPIO_ReadPin(Cross_Detector_GPIO_Port, Cross_Detector_Pin) == GPIO_PIN_SET){
         if(periodMs > 0 && periodMs < 100){
             period = (float)periodMs;
             frequency = 1000.0f / period;
@@ -114,4 +60,3 @@ void CrossDetection(void){
         acPresent = false;
     }
 }
-
